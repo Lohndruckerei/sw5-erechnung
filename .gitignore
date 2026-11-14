@@ -1,0 +1,5 @@
+tools/vendor/
+tools/out/
+tools/*.pdf
+tools/*.xml
+*.zip

@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/shopware/shopware/5.7/engine/Shopware/Components/Plugin/schema/config.xsd">
+    <elements>
+        <!-- Allgemein -->
+        <element type="boolean" scope="shop">
+            <name>enabled</name>
+            <label lang="de">E-Rechnung (ZUGFeRD) aktiv</label>
+            <label lang="en">E-invoice (ZUGFeRD) enabled</label>
+            <value>1</value>
+        </element>
+        <element type="text" scope="shop">
+            <name>invoiceDocumentIds</name>
+            <label lang="de">Belegtyp-IDs: Rechnung (380)</label>
+            <label lang="en">Document type IDs: invoice (380)</label>
+            <value>1</value>
+            <description lang="de">Kommagetrennte IDs aus s_core_documents (Standard: 1 = Rechnung).</description>
+        </element>
+        <element type="text" scope="shop">
+            <name>creditNoteDocumentIds</name>
+            <label lang="de">Belegtyp-IDs: Gutschrift / Storno (381)</label>
+            <label lang="en">Document type IDs: credit note (381)</label>
+            <value></value>
+            <description lang="de">Optional, z. B. "3,4" (Gutschrift, Stornorechnung). Die Ursprungsrechnung wird automatisch referenziert.</description>
+        </element>
+        <element type="boolean" scope="shop">
+            <name>fallbackToPlainPdf</name>
+            <label lang="de">Bei Fehler normales PDF erzeugen</label>
+            <label lang="en">Fall back to plain PDF on error</label>
+            <value>1</value>
+            <description lang="de">Fehlt z. B. eine Pflichtangabe, wird das normale PDF erzeugt und der Fehler im Plugin-Log protokolliert, damit die automatische Belegerstellung nicht abbricht.</description>
+        </element>
+        <element type="boolean" scope="shop">
+            <name>saveXmlCopy</name>
+            <label lang="de">XML zusätzlich speichern (files/documents/HASH.xml)</label>
+            <label lang="en">Additionally store XML next to the PDF</label>
+            <value>0</value>
+        </element>
+
+        <!-- Verkäufer -->
+        <element type="text" scope="shop" required="true">
+            <name>sellerName</name>
+            <label lang="de">Verkäufer: Firmenname</label>
+            <label lang="en">Seller: company name</label>
+        </element>
+        <element type="text" scope="shop" required="true">
+            <name>sellerStreet</name>
+            <label lang="de">Verkäufer: Straße + Nr.</label>
+            <label lang="en">Seller: street</label>
+        </element>
+        <element type="text" scope="shop" required="true">
+            <name>sellerZip</name>
+            <label lang="de">Verkäufer: PLZ</label>
+            <label lang="en">Seller: zip code</label>
+        </element>
+        <element type="text" scope="shop" required="true">
+            <name>sellerCity</name>
+            <label lang="de">Verkäufer: Ort</label>
+            <label lang="en">Seller: city</label>
+        </element>
+        <element type="text" scope="shop">
+            <name>sellerCountry</name>
+            <label lang="de">Verkäufer: Land (ISO-Code)</label>
+            <label lang="en">Seller: country (ISO code)</label>
+            <value>DE</value>
+        </element>
+        <element type="text" scope="shop">
+            <name>sellerVatId</name>
+            <label lang="de">Verkäufer: USt-IdNr.</label>
+            <label lang="en">Seller: VAT ID</label>
+            <description lang="de">USt-IdNr. oder Steuernummer ist Pflicht.</description>
+        </element>
+        <element type="text" scope="shop">
+            <name>sellerTaxNumber</name>
+            <label lang="de">Verkäufer: Steuernummer</label>
+            <label lang="en">Seller: tax number</label>
+        </element>
+        <element type="text" scope="shop">
+            <name>sellerRegister</name>
+            <label lang="de">Verkäufer: Handelsregister (z. B. "HRB 12345, AG München")</label>
+            <label lang="en">Seller: trade register</label>
+        </element>
+        <element type="text" scope="shop">
+            <name>sellerContactName</name>
+            <label lang="de">Verkäufer: Ansprechpartner</label>
+            <label lang="en">Seller: contact person</label>
+        </element>
+        <element type="text" scope="shop">
+            <name>sellerPhone</name>
+            <label lang="de">Verkäufer: Telefon</label>
+            <label lang="en">Seller: phone</label>
+        </element>
+        <element type="text" scope="shop">
+            <name>sellerEmail</name>
+            <label lang="de">Verkäufer: E-Mail (Rechnungsstellung)</label>
+            <label lang="en">Seller: e-mail</label>
+        </element>
+
+        <!-- Zahlung -->
+        <element type="text" scope="shop">
+            <name>sellerIban</name>
+            <label lang="de">Bankverbindung: IBAN</label>
+            <label lang="en">Bank account: IBAN</label>
+        </element>
+        <element type="text" scope="shop">
+            <name>sellerBic</name>
+            <label lang="de">Bankverbindung: BIC</label>
+            <label lang="en">Bank account: BIC</label>
+        </element>
+        <element type="text" scope="shop">
+            <name>sellerAccountName</name>
+            <label lang="de">Bankverbindung: Kontoinhaber</label>
+            <label lang="en">Bank account: holder</label>
+        </element>
+        <element type="number" scope="shop">
+            <name>paymentTermDays</name>
+            <label lang="de">Zahlungsziel in Tagen</label>
+            <label lang="en">Payment term (days)</label>
+            <value>14</value>
+        </element>
+        <element type="textarea" scope="shop">
+            <name>paymentMeansMapping</name>
+            <label lang="de">Zahlungsart → UNTDID-4461-Code</label>
+            <label lang="en">Payment method → UNTDID 4461 code</label>
+            <value>prepayment=58
+invoice=58
+debit=59
+sepa=59
+cash=10
+paypal=68
+</value>
+            <description lang="de">Je Zeile "technischer Name der Zahlungsart=Code". Codes: 58 SEPA-Überweisung, 30 Überweisung, 59 SEPA-Lastschrift, 54 Kreditkarte, 68 Online-Zahlungsdienst, 10 bar, 1 nicht definiert. Teiltreffer im Namen genügen (z. B. "paypal" passt auf "SwagPaymentPayPalUnified").</description>
+        </element>
+        <element type="text" scope="shop">
+            <name>defaultPaymentMeansCode</name>
+            <label lang="de">Zahlungsart-Code, wenn keine Zuordnung passt</label>
+            <label lang="en">Default payment means code</label>
+            <value>58</value>
+        </element>
+        <element type="boolean" scope="shop">
+            <name>paidStatusAsPrepaid</name>
+            <label lang="de">Bezahlte Bestellungen als "bereits bezahlt" ausweisen</label>
+            <label lang="en">Mark paid orders as prepaid</label>
+            <value>1</value>
+            <description lang="de">Bei Zahlungsstatus "komplett bezahlt" (12) wird der Betrag als Vorauszahlung ausgewiesen, der offene Betrag ist dann 0.</description>
+        </element>
+
+        <!-- Sonstiges -->
+        <element type="text" scope="shop">
+            <name>buyerReferenceField</name>
+            <label lang="de">Freitextfeld für Käuferreferenz / Leitweg-ID</label>
+            <label lang="en">Attribute field for buyer reference</label>
+            <value></value>
+            <description lang="de">Optional: Spalte aus s_order_billingaddress_attributes (z. B. "text1"). Ist sie leer, wird die Bestellnummer verwendet.</description>
+        </element>
+        <element type="text" scope="shop">
+            <name>unitCode</name>
+            <label lang="de">Standard-Mengeneinheit (UN/ECE Rec. 20)</label>
+            <label lang="en">Default unit code</label>
+            <value>H87</value>
+            <description lang="de">H87 = Stück, C62 = Einheit</description>
+        </element>
+        <element type="text" scope="shop">
+            <name>exemptionReason</name>
+            <label lang="de">Befreiungsgrund für steuerfreie Inlandsrechnungen</label>
+            <label lang="en">VAT exemption reason (domestic)</label>
+            <value>Steuerbefreit</value>
+        </element>
+    </elements>
+</config>

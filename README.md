@@ -4,6 +4,9 @@ Shopware-5-Plugin, das Rechnungs-PDFs **direkt beim Erzeugen** als ZUGFeRD-2.x-/
 schreibt: **Profil EN 16931 (COMFORT), PDF/A-3b mit eingebetteter `factur-x.xml`**.
 Es gibt keinen zweiten Bearbeitungsschritt am fertigen PDF.
 
+Für **öffentliche Auftraggeber** erzeugt dasselbe Plugin automatisch eine **XRechnung 3.0** (CII-Syntax),
+sobald beim Kunden eine **Leitweg-ID** hinterlegt ist (siehe [XRechnung](#xrechnung-für-behörden-leitweg-id)).
+
 ## Funktionsweise
 
 ```
@@ -41,6 +44,36 @@ Statuswechsel ──► Kuzo-Plugin ──► Shopware_Components_Document::init
 | Steuer | S (Standard), K (innergem. Lieferung), G (Export), Z/E |
 | Zahlung | Zahlungsart → UNTDID-4461-Code (konfigurierbar), IBAN/BIC, Zahlungsziel, „bereits bezahlt“ bei Zahlstatus 12 |
 | Gutschrift/Storno (optional) | Typ 381 mit Verweis auf die Ursprungsrechnung |
+| Käuferreferenz (BT-10) | Leitweg-ID, sonst Bestellnummer |
+
+## XRechnung für Behörden (Leitweg-ID)
+
+**Einrichtung**
+
+1. In der Plugin-Konfiguration „XRechnung erzeugen“ auf **Automatisch bei Leitweg-ID** lassen (Standard).
+   **Ansprechpartner, Telefon, E-Mail und IBAN** des Verkäufers ausfüllen. Für XRechnung sind sie Pflicht.
+2. Beim Kunden (Backend → Kunden → Freitextfeld **„Leitweg-ID (XRechnung)“**) die Leitweg-ID eintragen,
+   z. B. `991-12345678-06`. Die Behörde teilt sie mit, meist steht sie in der Bestellung oder im Auftrag.
+   * Hat eine Behörde mehrere Dienststellen mit eigenen Leitweg-IDs, das gleichnamige Feld an der **Adresse** verwenden.
+     Es wird bei der Bestellung in die Rechnungsadresse übernommen und hat Vorrang.
+   * Steht die Leitweg-ID schon in einem anderen Freitextfeld, dieses unter „Zusätzliches Freitextfeld mit Leitweg-ID“ eintragen.
+
+**Was dann passiert**
+
+* Die Rechnung wird als XRechnung 3.0 erzeugt (`urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0`).
+  Die Leitweg-ID steht als Käuferreferenz (BT-10) und als elektronische Adresse des Käufers (BT-49, Schema 0204) in der XML.
+* Das **PDF** enthält die XRechnung eingebettet (ZUGFeRD-Profil `XRECHNUNG`). Zusätzlich wird die **reine XML**
+  unter `files/documents/<hash>.xml` gespeichert, weil Behördenportale (ZRE, OZG-RE, Peppol) in der Regel nur die XML annehmen.
+* Download im Backend, bei angemeldetem Benutzer:
+  `https://<shop>/backend/LdZugferdXml/download?order=<Bestellnummer>`
+* Leitweg-IDs mit falschem Aufbau oder falscher Prüfziffer werden im Plugin-Log gemeldet.
+* Fehlt eine XRechnung-Pflichtangabe, entsteht stattdessen ZUGFeRD EN 16931 und ein Fehler im Log mit Regelnummer (z. B. `BR-DE-6`).
+* Zahlungsarten Lastschrift (59) und Karte (48/54/55) verlangen in der XRechnung Mandats- bzw. Kartendaten.
+  Diese kennt das Plugin nicht, deshalb wird für solche Bestellungen ZUGFeRD erzeugt. Behörden zahlen praktisch immer per Überweisung (58).
+
+**Versand an die Behörde:** Upload der XML im Rechnungsportal (Bund: ZRE, Länder/Kommunen: z. B. OZG-RE) oder per Peppol.
+Manche Behörden nehmen auch E-Mail an. Ein automatischer Versand der XML (z. B. als Mail-Anhang der Kuzo-Automatik) ist
+noch nicht enthalten.
 
 ## Installation
 
@@ -64,12 +97,17 @@ Voraussetzung: Shopware 5.6 oder 5.7 (mitgeliefertes mPDF 7/8), PHP-Erweiterung 
   cd tools && composer install
   php generate-sample.php gross /tmp/sample.pdf     # Beispiel-PDF + XML
   php test-invoice-data.php /tmp/out                # simulierte Shopware-Bestellungen
+  php generate-sample.php xrechnung /tmp/xr.pdf     # Beispiel-XRechnung
   pip install saxonche && python3 validate-schematron.py <EN16931-CII-validation.xslt> /tmp/out/*.xml
+  # XRechnung-Regeln der KoSIT (Repository itplr-kosit/xrechnung-schematron) vorher kompilieren:
+  python3 compile-schematron.py XRechnung-CII-validation.sch xr-cii.xsl <schematron/trunk/schematron/code>
+  python3 validate-schematron.py xr-cii.xsl /tmp/out/behoerde.xml
   ```
-  Die XSLT steht im Repository `ConnectingEurope/eInvoicing-EN16931` unter `cii/xslt/`.
+  Die EN-16931-XSLT steht im Repository `ConnectingEurope/eInvoicing-EN16931` unter `cii/xslt/`.
 
-Stand der Entwicklung: Alle Testfälle (brutto, netto/B2B, EU steuerfrei, Export, Gutschrift) bestehen
-das CII-D16B-XSD und die offizielle EN-16931-Schematron ohne Fehler und Warnungen. Die Einbettung (PDF/A-3-Kennung,
+Stand der Entwicklung: Alle Testfälle (brutto, netto/B2B, EU steuerfrei, Export, Gutschrift, Behörde) bestehen
+das CII-D16B-XSD und die offizielle EN-16931-Schematron ohne Fehler und Warnungen. Der Behörden-Fall besteht zusätzlich die
+XRechnung-3.0-Schematron der KoSIT (v2.6.0). Die Einbettung (PDF/A-3-Kennung,
 `/AF`, `/EmbeddedFiles`, OutputIntent, XMP) ist geprüft, die eingebettete XML ist byte-identisch.
 **Noch offen: ein Test im echten Shop mit Kuzo und eine veraPDF-Prüfung mit dem echten Rechnungs-Template.**
 
@@ -79,10 +117,10 @@ das CII-D16B-XSD und die offizielle EN-16931-Schematron ohne Fehler und Warnunge
   Transparenz kann dabei sichtbar verändert werden. Empfehlung: Logo als JPG oder PNG ohne Alphakanal verwenden.
 * **Kuzo**: Das Plugin funktioniert, wenn Kuzo Belege über `Shopware_Components_Document` erzeugt (Standardweg in SW5).
   Erzeugt Kuzo PDFs mit einer eigenen PDF-Bibliothek, greift der Hook nicht. Das zeigt der Test unter Punkt 5.
-* **Öffentliche Auftraggeber (B2G)** verlangen meist **XRechnung** mit Leitweg-ID. Das Feld „Käuferreferenz“ kann per
-  Freitextfeld befüllt werden. Ein vollständiges XRechnung-Profil ist in dieser Version nicht enthalten.
 * Rabatte und Gutscheine erscheinen als Positionen mit negativer Menge, nicht als Belegrabatt (BG-20). Das ist EN-16931-konform.
-* SEPA-Lastschrift (59) wird ohne Mandatsreferenz und Gläubiger-ID ausgegeben. Für EN 16931 reicht das, für XRechnung nicht.
+* SEPA-Lastschrift (59) wird ohne Mandatsreferenz und Gläubiger-ID ausgegeben. Für EN 16931 reicht das, für XRechnung nicht (siehe oben).
+* Die Leitweg-ID kann nur im Backend eingetragen werden. Ein Eingabefeld im Checkout oder in der Adressverwaltung des Shops
+  bräuchte eine Template-Erweiterung.
 
 ## Rechtlicher Rahmen (Wachstumschancengesetz, B2B im Inland)
 

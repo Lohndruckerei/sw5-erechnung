@@ -4,7 +4,7 @@
  * um XML und PDF/A-3 mit einem Validator (z. B. Mustang, veraPDF, KoSIT) zu prüfen.
  *
  *   composer require mpdf/mpdf:8.2.5   (im Ordner tools/)
- *   php tools/generate-sample.php [gross|net|ic|credit] out.pdf
+ *   php tools/generate-sample.php [gross|net|ic|credit|xrechnung] out.pdf
  */
 require __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/../LdZugferd/Components/TotalsCalculator.php';
@@ -61,7 +61,8 @@ $invoice = [
     'dueDate' => new DateTimeImmutable('2026-11-28'),
     'currency' => 'EUR',
     'orderNumber' => '30001',
-    'buyerReference' => '30001',
+    'profile' => $scenario === 'xrechnung' ? CiiXmlBuilder::PROFILE_XRECHNUNG : CiiXmlBuilder::PROFILE_EN16931,
+    'buyerReference' => $scenario === 'xrechnung' ? '991-33333TEST-33' : '30001',
     'notes' => [['content' => 'Muster GmbH, HRB 12345, AG Musterstadt', 'subjectCode' => 'REG']],
     'seller' => [
         'name' => 'Muster Druckerei GmbH', 'street' => 'Musterstraße 1', 'zip' => '12345', 'city' => 'Musterstadt',
@@ -90,7 +91,7 @@ foreach ($calc['lines'] as $l) {
 $html .= '</table><p>Summe: ' . number_format($totals['grandTotal'], 2, ',', '.') . ' €</p>';
 
 $mpdf = new \Mpdf\Mpdf(['mode' => 'utf-8', 'format' => 'A4', 'tempDir' => sys_get_temp_dir()]);
-(new ZugferdPdfEmbedder())->apply($mpdf, $xml);
+(new ZugferdPdfEmbedder())->apply($mpdf, $xml, $scenario === 'xrechnung' ? 'XRECHNUNG' : 'EN 16931');
 $mpdf->WriteHTML($html);
 $mpdf->Output($out, 'F');
 echo "OK $out\n";

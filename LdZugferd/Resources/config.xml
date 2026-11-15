@@ -37,6 +37,19 @@
             <value>0</value>
         </element>
 
+        <element type="combo" scope="shop">
+            <name>xrechnungMode</name>
+            <label lang="de">XRechnung erzeugen</label>
+            <label lang="en">Create XRechnung</label>
+            <value>auto</value>
+            <description lang="de">"Automatisch": XRechnung, sobald beim Kunden, an der Rechnungsadresse oder im Freitextfeld unten eine Leitweg-ID hinterlegt ist, sonst ZUGFeRD EN 16931. Die XRechnung wird ins PDF eingebettet und zusätzlich als XML gespeichert. Fehlen Pflichtangaben, entsteht ZUGFeRD EN 16931 und ein Log-Eintrag.</description>
+            <store>
+                <option><value>auto</value><label lang="de">Automatisch bei Leitweg-ID</label><label lang="en">Automatically if Leitweg-ID is set</label></option>
+                <option><value>always</value><label lang="de">Immer</label><label lang="en">Always</label></option>
+                <option><value>never</value><label lang="de">Nie</label><label lang="en">Never</label></option>
+            </store>
+        </element>
+
         <!-- Verkäufer -->
         <element type="text" scope="shop" required="true">
             <name>sellerName</name>
@@ -84,16 +97,19 @@
             <name>sellerContactName</name>
             <label lang="de">Verkäufer: Ansprechpartner</label>
             <label lang="en">Seller: contact person</label>
+            <description lang="de">Pflicht für XRechnung.</description>
         </element>
         <element type="text" scope="shop">
             <name>sellerPhone</name>
             <label lang="de">Verkäufer: Telefon</label>
             <label lang="en">Seller: phone</label>
+            <description lang="de">Pflicht für XRechnung.</description>
         </element>
         <element type="text" scope="shop">
             <name>sellerEmail</name>
             <label lang="de">Verkäufer: E-Mail (Rechnungsstellung)</label>
             <label lang="en">Seller: e-mail</label>
+            <description lang="de">Pflicht für XRechnung.</description>
         </element>
 
         <!-- Zahlung -->
@@ -148,10 +164,10 @@ paypal=68
         <!-- Sonstiges -->
         <element type="text" scope="shop">
             <name>buyerReferenceField</name>
-            <label lang="de">Freitextfeld für Käuferreferenz / Leitweg-ID</label>
+            <label lang="de">Zusätzliches Freitextfeld mit Leitweg-ID</label>
             <label lang="en">Attribute field for buyer reference</label>
             <value></value>
-            <description lang="de">Optional: Spalte aus s_order_billingaddress_attributes (z. B. "text1"). Ist sie leer, wird die Bestellnummer verwendet.</description>
+            <description lang="de">Optional, falls die Leitweg-ID schon in einem vorhandenen Freitextfeld der Rechnungsadresse steht (Spalte aus s_order_billingaddress_attributes, z. B. "text1"). Das Plugin legt außerdem das Feld "Leitweg-ID (XRechnung)" an Kunde und Adresse an. Ohne Leitweg-ID wird die Bestellnummer als Käuferreferenz verwendet.</description>
         </element>
         <element type="text" scope="shop">
             <name>unitCode</name>

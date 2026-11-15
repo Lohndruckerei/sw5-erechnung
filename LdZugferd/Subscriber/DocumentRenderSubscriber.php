@@ -132,9 +132,12 @@ class DocumentRenderSubscriber implements SubscriberInterface
         $mpdf = new Mpdf($mpdfConfig);
         $mpdf->setLogger(Shopware()->Container()->get('corelogger'));
 
-        $xml = $this->buildXml($document, $config, $typeCode);
+        $result = $this->buildXml($document, $config, $typeCode);
+        $xml = $result !== null ? $result['xml'] : null;
+        $isXRechnung = $result !== null && $result['profile'] === CiiXmlBuilder::PROFILE_XRECHNUNG;
         if ($xml !== null) {
-            $this->embedder->apply($mpdf, $xml, 'EN 16931', 'INVOICE');
+            // ZUGFeRD 2.2+: Profil XRECHNUNG wird ebenfalls als factur-x.xml eingebettet
+            $this->embedder->apply($mpdf, $xml, $isXRechnung ? 'XRECHNUNG' : 'EN 16931', 'INVOICE');
         }
 
         $mpdf->WriteHTML($html);
@@ -150,29 +153,33 @@ class DocumentRenderSubscriber implements SubscriberInterface
         }
         unlink($tmpFile);
 
-        if ($xml !== null && !empty($config['saveXmlCopy'])) {
+        // XRechnung immer zusätzlich als reine XML ablegen: Behördenportale (ZRE, OZG-RE, Peppol) erwarten meist nur die XML.
+        if ($xml !== null && ($isXRechnung || !empty($config['saveXmlCopy']))) {
             $filesystem->put(sprintf('documents/%s.xml', $document->_documentHash), $xml);
         }
     }
 
     /**
-     * @return string|null XML oder null, wenn auf ein normales PDF zurückgefallen werden soll
+     * @return array{xml: string, profile: string}|null null = auf ein normales PDF zurückfallen
      */
     private function buildXml(Shopware_Components_Document $document, array $config, string $typeCode)
     {
-        try {
-            $data = $this->dataFactory->create($document, $config, $typeCode);
+        $profile = $this->resolveProfile($document, $config);
 
-            if ($typeCode === '380' && abs($data['totals']['grandTotal'] - $data['shopInvoiceAmount']) >= 0.01) {
-                $this->logger->warning(sprintf(
-                    'ZUGFeRD: Gesamtbetrag XML (%.2f) weicht von Bestellung %s (%.2f) ab.',
-                    $data['totals']['grandTotal'],
-                    $data['orderNumber'],
-                    $data['shopInvoiceAmount']
-                ));
+        try {
+            if ($profile === CiiXmlBuilder::PROFILE_XRECHNUNG) {
+                try {
+                    return ['xml' => $this->buildXmlForProfile($document, $config, $typeCode, $profile), 'profile' => $profile];
+                } catch (\InvalidArgumentException $e) {
+                    // Pflichtangaben für XRechnung fehlen -> wenigstens ZUGFeRD EN 16931 erzeugen
+                    $this->logger->error('XRechnung nicht möglich, erzeuge ZUGFeRD EN 16931: ' . $e->getMessage(), [
+                        'orderId' => $document->_order->id,
+                    ]);
+                    $profile = CiiXmlBuilder::PROFILE_EN16931;
+                }
             }
 
-            return $this->xmlBuilder->build($data);
+            return ['xml' => $this->buildXmlForProfile($document, $config, $typeCode, $profile), 'profile' => $profile];
         } catch (\Throwable $e) {
             $this->logger->error('ZUGFeRD: XML konnte nicht erzeugt werden: ' . $e->getMessage(), [
                 'orderId' => $document->_order->id,
@@ -186,6 +193,45 @@ class DocumentRenderSubscriber implements SubscriberInterface
 
             return null;
         }
+    }
+
+    private function buildXmlForProfile(Shopware_Components_Document $document, array $config, string $typeCode, string $profile): string
+    {
+        $data = $this->dataFactory->create($document, $config, $typeCode, $profile);
+
+        if ($typeCode === '380' && abs($data['totals']['grandTotal'] - $data['shopInvoiceAmount']) >= 0.01) {
+            $this->logger->warning(sprintf(
+                'E-Rechnung: Gesamtbetrag XML (%.2f) weicht von Bestellung %s (%.2f) ab.',
+                $data['totals']['grandTotal'],
+                $data['orderNumber'],
+                $data['shopInvoiceAmount']
+            ));
+        }
+        if ($data['leitwegId'] !== '' && !InvoiceDataFactory::isValidLeitwegId($data['leitwegId'])) {
+            $this->logger->warning(sprintf(
+                'XRechnung: Leitweg-ID "%s" (Bestellung %s) hat ein ungültiges Format oder eine falsche Prüfziffer.',
+                $data['leitwegId'],
+                $data['orderNumber']
+            ));
+        }
+
+        return $this->xmlBuilder->build($data);
+    }
+
+    /**
+     * XRechnung bei Modus "always" oder bei Modus "auto", wenn eine Leitweg-ID hinterlegt ist.
+     */
+    private function resolveProfile(Shopware_Components_Document $document, array $config): string
+    {
+        $mode = isset($config['xrechnungMode']) ? (string) $config['xrechnungMode'] : 'auto';
+        if ($mode === 'always') {
+            return CiiXmlBuilder::PROFILE_XRECHNUNG;
+        }
+        if ($mode === 'auto' && $this->dataFactory->findLeitwegId($document, $config) !== '') {
+            return CiiXmlBuilder::PROFILE_XRECHNUNG;
+        }
+
+        return CiiXmlBuilder::PROFILE_EN16931;
     }
 
     /**

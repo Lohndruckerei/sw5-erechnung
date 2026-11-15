@@ -14,6 +14,9 @@ class InvoiceDataFactory
 {
     const PAYMENT_STATUS_COMPLETELY_PAID = 12;
 
+    /** Freitextfeld (Kunde, Adresse, Bestell-Rechnungsadresse), das das Plugin anlegt */
+    const LEITWEG_ID_FIELD = 'ld_leitweg_id';
+
     const EU_COUNTRIES = [
         'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU',
         'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK',
@@ -31,7 +34,10 @@ class InvoiceDataFactory
         $this->connection = $connection;
     }
 
-    public function create(Shopware_Components_Document $document, array $config, string $typeCode): array
+    /**
+     * @param string $profile CiiXmlBuilder::PROFILE_EN16931 oder CiiXmlBuilder::PROFILE_XRECHNUNG
+     */
+    public function create(Shopware_Components_Document $document, array $config, string $typeCode, string $profile = CiiXmlBuilder::PROFILE_EN16931): array
     {
         $docOrder = $document->_order;
         $order = $docOrder->order;
@@ -120,10 +126,8 @@ class InvoiceDataFactory
             $notes[] = ['content' => $config['sellerName'] . ', ' . $config['sellerRegister'], 'subjectCode' => 'REG'];
         }
 
-        $buyerReference = (string) $order['ordernumber'];
-        if (!empty($config['buyerReferenceField']) && !empty($billing['attributes'][$config['buyerReferenceField']])) {
-            $buyerReference = (string) $billing['attributes'][$config['buyerReferenceField']];
-        }
+        $leitwegId = $this->findLeitwegId($document, $config);
+        $buyerReference = $leitwegId !== '' ? $leitwegId : (string) $order['ordernumber'];
 
         $company = trim((string) $billing['company']);
         $personName = trim($billing['firstname'] . ' ' . $billing['lastname']);
@@ -138,6 +142,8 @@ class InvoiceDataFactory
             'dueDate' => $dueDate,
             'currency' => strtoupper($order['currency'] ?: 'EUR'),
             'orderNumber' => (string) $order['ordernumber'],
+            'profile' => $profile,
+            'leitwegId' => $leitwegId,
             'buyerReference' => $buyerReference,
             'notes' => $notes,
             'seller' => [
@@ -165,6 +171,9 @@ class InvoiceDataFactory
                 'vatId' => $this->normalizeVatId($billing['ustid']),
                 'email' => isset($user['email']) ? (string) $user['email'] : '',
                 'phone' => isset($billing['phone']) ? (string) $billing['phone'] : '',
+                // BT-49: Bei Behörden ist die Leitweg-ID die elektronische Adresse (Schema 0204)
+                'electronicAddress' => $leitwegId,
+                'electronicAddressScheme' => '0204',
             ],
             'shipTo' => [
                 'name' => $shipCompany !== '' ? $shipCompany : $shipPerson,
@@ -189,6 +198,58 @@ class InvoiceDataFactory
             // nur zum Abgleich/Logging, nicht Teil der XML
             'shopInvoiceAmount' => (float) $order['invoice_amount'],
         ];
+    }
+
+    /**
+     * Leitweg-ID suchen: Rechnungsadresse der Bestellung -> konfiguriertes Freitextfeld -> Kundenkonto.
+     */
+    public function findLeitwegId(Shopware_Components_Document $document, array $config): string
+    {
+        $billing = $document->_order->billing;
+        $billingAttributes = $billing && isset($billing['attributes']) && is_array($billing['attributes']) ? $billing['attributes'] : [];
+
+        $candidates = [];
+        $candidates[] = isset($billingAttributes[self::LEITWEG_ID_FIELD]) ? $billingAttributes[self::LEITWEG_ID_FIELD] : null;
+        if (!empty($config['buyerReferenceField'])) {
+            $field = $config['buyerReferenceField'];
+            $candidates[] = isset($billingAttributes[$field]) ? $billingAttributes[$field] : null;
+        }
+        $userId = (int) $document->_order->userID;
+        if ($userId > 0) {
+            $userAttributes = $document->getUserAttributes($userId);
+            $candidates[] = is_array($userAttributes) && isset($userAttributes[self::LEITWEG_ID_FIELD]) ? $userAttributes[self::LEITWEG_ID_FIELD] : null;
+        }
+
+        foreach ($candidates as $value) {
+            $value = strtoupper(preg_replace('/\s+/', '', (string) $value));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Prüft Aufbau und Prüfziffer einer Leitweg-ID (Grobadressierung-Feinadressierung-Prüfziffer,
+     * Prüfziffer nach ISO 7064 Modulo 97-10 wie bei der IBAN).
+     */
+    public static function isValidLeitwegId(string $id): bool
+    {
+        if (!preg_match('/^(\d{2,12})(?:-([A-Z0-9]{1,30}))?-(\d{2})$/', strtoupper($id), $m)) {
+            return false;
+        }
+        $raw = $m[1] . $m[2] . $m[3];
+        $numeric = '';
+        foreach (str_split($raw) as $char) {
+            $numeric .= ctype_alpha($char) ? (string) (ord($char) - 55) : $char;
+        }
+        $remainder = 0;
+        foreach (str_split($numeric, 7) as $chunk) {
+            $remainder = (int) (($remainder . $chunk) % 97);
+        }
+
+        return $remainder === 1;
     }
 
     private function assignTaxCategory(array &$line, bool $taxFree, string $sellerCountry, string $shipCountry, float $maxRate, array $config)

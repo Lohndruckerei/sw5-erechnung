@@ -6,7 +6,8 @@ use DOMDocument;
 use DOMElement;
 
 /**
- * Erzeugt UN/CEFACT CII D16B XML im Profil EN 16931 (ZUGFeRD 2.x "COMFORT" / Factur-X EN16931).
+ * Erzeugt UN/CEFACT CII D16B XML im Profil EN 16931 (ZUGFeRD 2.x "COMFORT" / Factur-X EN16931)
+ * oder – mit $invoice['profile'] = 'XRECHNUNG' – als XRechnung 3.0 (CII-Syntax).
  *
  * Die Eingabe ist ein reines Array (siehe InvoiceDataFactory), damit der Builder
  * unabhängig von Shopware testbar ist.
@@ -14,6 +15,10 @@ use DOMElement;
 class CiiXmlBuilder
 {
     const GUIDELINE_EN16931 = 'urn:cen.eu:en16931:2017';
+    const GUIDELINE_XRECHNUNG = 'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
+
+    const PROFILE_EN16931 = 'EN16931';
+    const PROFILE_XRECHNUNG = 'XRECHNUNG';
 
     const NS_RSM = 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100';
     const NS_RAM = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
@@ -39,7 +44,7 @@ class CiiXmlBuilder
         // BG-2 Prozesssteuerung
         $context = $this->rsm($root, 'ExchangedDocumentContext');
         $guideline = $this->ram($context, 'GuidelineSpecifiedDocumentContextParameter');
-        $this->ram($guideline, 'ID', self::GUIDELINE_EN16931);
+        $this->ram($guideline, 'ID', $this->isXRechnung($invoice) ? self::GUIDELINE_XRECHNUNG : self::GUIDELINE_EN16931);
 
         // Kopf
         $doc = $this->rsm($root, 'ExchangedDocument');
@@ -190,6 +195,58 @@ class CiiXmlBuilder
         if ($missing) {
             throw new \InvalidArgumentException('E-Rechnung: Pflichtangaben fehlen: ' . implode(', ', $missing));
         }
+
+        if ($this->isXRechnung($invoice)) {
+            $this->validateXRechnung($invoice);
+        }
+    }
+
+    /**
+     * Zusätzliche Pflichtangaben der XRechnung (CIUS, Regeln BR-DE-*).
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function validateXRechnung(array $invoice)
+    {
+        $missing = [];
+        if (empty($invoice['buyerReference'])) {
+            $missing[] = 'buyerReference/Leitweg-ID (BR-DE-15)';
+        }
+        // BR-DE-2, -5, -6, -7: Kontakt des Verkäufers
+        foreach (['contactName' => 'BR-DE-5', 'phone' => 'BR-DE-6', 'email' => 'BR-DE-7'] as $field => $rule) {
+            if (empty($invoice['seller'][$field])) {
+                $missing[] = 'seller.' . $field . ' (' . $rule . ')';
+            }
+        }
+        // BR-DE-8, -9
+        foreach (['zip', 'city'] as $field) {
+            if (empty($invoice['buyer'][$field])) {
+                $missing[] = 'buyer.' . $field;
+            }
+        }
+        if (!empty($invoice['shipTo']) && (empty($invoice['shipTo']['zip']) || empty($invoice['shipTo']['city']))) {
+            $missing[] = 'shipTo.zip/city (BR-DE-10/11)';
+        }
+        // BR-DE-1 und BR-DE-23/24/25: Zahlungsanweisungen
+        $code = isset($invoice['payment']['code']) ? (string) $invoice['payment']['code'] : '';
+        if ($code === '') {
+            $missing[] = 'payment.code (BR-DE-1)';
+        } elseif (in_array($code, ['30', '58'], true) && empty($invoice['payment']['iban'])) {
+            $missing[] = 'payment.iban (BR-DE-23)';
+        } elseif (in_array($code, ['48', '54', '55', '59'], true)) {
+            $missing[] = 'payment.code ' . $code . ' benötigt Karten-/Mandatsdaten (BR-DE-24/25), bitte anderen Code zuordnen';
+        }
+        if (!in_array((string) $invoice['typeCode'], ['326', '380', '384', '389', '381', '875', '876', '877'], true)) {
+            $missing[] = 'typeCode (BR-DE-17)';
+        }
+        if ($missing) {
+            throw new \InvalidArgumentException('XRechnung: Pflichtangaben fehlen: ' . implode(', ', $missing));
+        }
+    }
+
+    private function isXRechnung(array $invoice): bool
+    {
+        return isset($invoice['profile']) && $invoice['profile'] === self::PROFILE_XRECHNUNG;
     }
 
     private function addLine(DOMElement $parent, array $line, int $lineNo)
@@ -248,8 +305,12 @@ class CiiXmlBuilder
             }
         }
         $this->addAddress($p, $party);
-        if (!empty($party['email'])) {
-            // BT-34 / BT-49 elektronische Adresse
+        // BT-34 / BT-49 elektronische Adresse: explizit gesetzt (z. B. Leitweg-ID mit Schema 0204), sonst E-Mail
+        if (!empty($party['electronicAddress'])) {
+            $uri = $this->ram($p, 'URIUniversalCommunication');
+            $id = $this->ram($uri, 'URIID', $party['electronicAddress']);
+            $id->setAttribute('schemeID', $party['electronicAddressScheme']);
+        } elseif (!empty($party['email'])) {
             $uri = $this->ram($p, 'URIUniversalCommunication');
             $id = $this->ram($uri, 'URIID', $party['email']);
             $id->setAttribute('schemeID', 'EM');

@@ -30,7 +30,14 @@ compose_up() {
         echo "Docker Hub antwortet nicht (Versuch $try/5), neuer Versuch in $((try * 30)) s ..."
         sleep $((try * 30))
     done
-    compose up -d --build
+    # Build ebenfalls wiederholen (Docker Hub / Credential-Helper von Docker Desktop fallen gelegentlich kurz aus)
+    for try in 1 2 3; do
+        compose build && break
+        [ "$try" = 3 ] && { echo "Image konnte nicht gebaut werden (siehe Fehler oben)."; exit 1; }
+        echo "Build fehlgeschlagen (Versuch $try/3), neuer Versuch in $((try * 20)) s ..."
+        sleep $((try * 20))
+    done
+    compose up -d
 }
 
 # Wert in .env setzen (vorhandene Zeile ersetzen oder anhängen)
@@ -120,7 +127,8 @@ cmd_rechnung() {
 }
 
 # Frische Shopware-5.7-Installation mit Testdaten aufsetzen und das E-Rechnungs-Plugin testen
-cmd_neu() {
+# Schritte 1 und 2 von "neu": Shopware aus dem Demo-Image holen, Testdaten anlegen
+neu_download() {
     if [ -f "$SHOP_DIR/shopware.php" ]; then
         echo "In $SHOP_DIR liegt bereits ein Shop. Für einen kompletten Neuanfang:"
         echo "  ./testsystem.sh destroy && rm -rf $SHOP_DIR $DEMO_DUMP && ./testsystem.sh neu"
@@ -153,6 +161,16 @@ cmd_neu() {
     mkdir -p "$SHOP_DIR"
     docker cp sw5-entwicklung-quelle:/var/www/html/. "$SHOP_DIR/"
     docker rm -f sw5-entwicklung-quelle >/dev/null
+}
+
+cmd_neu() {
+    # Abgebrochener Lauf: Shop-Dateien und Demo-Dump sind schon da -> ab Schritt 3 fortsetzen
+    if [ -f "$SHOP_DIR/shopware.php" ] && [ -f "$DEMO_DUMP" ]; then
+        echo "Shop-Dateien und $DEMO_DUMP liegen schon vor, setze bei Schritt 3 fort."
+        echo "(Komplett neu: ./testsystem.sh destroy && rm -rf $SHOP_DIR $DEMO_DUMP && ./testsystem.sh neu)"
+    else
+        neu_download
+    fi
 
     echo "== 3/5 Testsystem sw5-entwicklung aufbauen (wie bei einem Live-Dump) =="
     cmd_import "$DEMO_DUMP"

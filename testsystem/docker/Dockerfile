@@ -8,18 +8,22 @@ ARG HOST_UID=1000
 ARG HOST_GID=1000
 ARG INSTALL_IONCUBE=1
 
-# Ältere Debian-Versionen (z. B. bei PHP 7.4) liegen inzwischen im Archiv -> Fallback auf archive.debian.org
+# Ältere Debian-Versionen (z. B. Bullseye bei PHP 7.4/8.0) liegen inzwischen im Archiv. Auf deb.debian.org
+# stehen dann teils noch die Paketlisten, die Pakete selbst fehlen (404) -> bei Fehlern auf archive.debian.org umstellen.
 RUN set -eux; \
-    apt-get update || true; \
-    if ! apt-cache show libicu-dev >/dev/null 2>&1; then \
-        for f in /etc/apt/sources.list /etc/apt/sources.list.d/*; do \
-            [ -f "$f" ] && sed -i -e 's|deb.debian.org|archive.debian.org|g' -e 's|security.debian.org|archive.debian.org|g' -e '/-updates/d' "$f"; \
+    pkgs="libicu-dev libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev libwebp-dev msmtp msmtp-mta unzip curl ca-certificates"; \
+    if ! { apt-get update && apt-get install -y --no-install-recommends $pkgs; }; then \
+        echo "Paketquellen nicht vollständig erreichbar, stelle auf archive.debian.org um"; \
+        for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do \
+            if [ -f "$f" ]; then sed -i -e 's|deb.debian.org|archive.debian.org|g' -e 's|security.debian.org|archive.debian.org|g' -e '/-updates/d' "$f"; fi; \
         done; \
+        for f in /etc/apt/sources.list.d/*.sources; do \
+            if [ -f "$f" ]; then sed -i -E -e 's|deb.debian.org|archive.debian.org|g' -e 's|security.debian.org|archive.debian.org|g' -e 's/ [a-z]+-updates//g' "$f"; fi; \
+        done; \
+        rm -rf /var/lib/apt/lists/*; \
         apt-get -o Acquire::Check-Valid-Until=false update; \
+        apt-get install -y --no-install-recommends $pkgs; \
     fi; \
-    apt-get install -y --no-install-recommends \
-        libicu-dev libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev libwebp-dev \
-        msmtp msmtp-mta unzip curl ca-certificates; \
     docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp; \
     docker-php-ext-install -j"$(nproc)" pdo_mysql gd intl zip opcache; \
     pecl install apcu; \

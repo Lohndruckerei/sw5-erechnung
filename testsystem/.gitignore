@@ -6,3 +6,4 @@ shop/
 *.zip
 *.bak
 !docker/demo-data.sql
+!docker/after-import.sql

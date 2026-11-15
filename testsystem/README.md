@@ -28,15 +28,14 @@ Deshalb gilt:
 
 Trotzdem enthält das Testsystem echte Kundendaten. Den Dump vertraulich behandeln und das System nicht öffentlich machen.
 
-## Schnellstart ohne Live-Daten (noch nicht vollständig getestet)
+## Schnellstart ohne Live-Daten
 
 ```bash
 ./testsystem.sh neu
 ```
 Setzt ein frisches Shopware 5.7.19 mit zwei Testbestellungen auf (20001 Firma, 20002 Behörde mit Leitweg-ID),
 konfiguriert das E-Rechnungs-Plugin mit Testdaten, erzeugt beide Rechnungen und prüft sie (`./testsystem.sh test`).
-Dieser Befehl wurde in der Entwicklungsumgebung nur teilweise durchlaufen, weil Docker Hub die Downloads begrenzt hat.
-Beim ersten Lauf bitte auf Fehler achten.
+Bricht der Lauf ab (z. B. Docker-Hub-Limit), setzt ein erneutes `./testsystem.sh neu` nach dem Download bei Schritt 3 fort.
 
 ## Einrichtung
 
@@ -125,5 +124,6 @@ Testbestellung. Geprüft wurden:
 * E-Rechnung und XRechnung über `rechnung` erzeugt und validiert
 * XML-Download im Backend
 
-Einschränkung: Das Image aus `docker/Dockerfile` ließ sich in der Testumgebung nicht bauen, weil dort keine Paketquellen
-erreichbar waren. Für den Test wurde ein vorhandenes Shopware-Image verwendet. Den Build selbst bitte beim ersten Start beobachten.
+`./testsystem.sh neu` inklusive Build des Images aus `docker/Dockerfile` (PHP 8.0 auf Debian Bullseye, Pakete aus
+archive.debian.org) unter Docker Desktop/WSL2 komplett durchgelaufen: „ERGEBNIS: Alle Prüfungen bestanden.“
+Für PHP 8.0 gibt es keinen ionCube-Loader; er wird dann übersprungen.

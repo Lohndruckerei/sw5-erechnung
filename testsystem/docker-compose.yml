@@ -17,6 +17,7 @@ services:
       - ./docker/config.php:/var/www/html/config.php:ro
       - ../LdZugferd:/var/www/html/custom/plugins/LdZugferd
       - ./docker/create-document.php:/opt/testsystem/create-document.php:ro
+      - ./docker/check-einvoice.php:/opt/testsystem/check-einvoice.php:ro
     depends_on:
       db:
         condition: service_healthy

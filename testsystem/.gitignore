@@ -4,3 +4,5 @@ shop/
 *.sql
 *.sql.gz
 *.zip
+*.bak
+!docker/demo-data.sql

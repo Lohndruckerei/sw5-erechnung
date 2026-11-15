@@ -28,6 +28,16 @@ Deshalb gilt:
 
 Trotzdem enthält das Testsystem echte Kundendaten. Den Dump vertraulich behandeln und das System nicht öffentlich machen.
 
+## Schnellstart ohne Live-Daten (noch nicht vollständig getestet)
+
+```bash
+./testsystem.sh neu
+```
+Setzt ein frisches Shopware 5.7.19 mit zwei Testbestellungen auf (20001 Firma, 20002 Behörde mit Leitweg-ID),
+konfiguriert das E-Rechnungs-Plugin mit Testdaten, erzeugt beide Rechnungen und prüft sie (`./testsystem.sh test`).
+Dieser Befehl wurde in der Entwicklungsumgebung nur teilweise durchlaufen, weil Docker Hub die Downloads begrenzt hat.
+Beim ersten Lauf bitte auf Fehler achten.
+
 ## Einrichtung
 
 Voraussetzung: Docker mit Docker Compose. Unter Windows `testsystem.sh` in WSL oder Git Bash ausführen.

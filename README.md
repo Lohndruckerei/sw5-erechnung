@@ -28,9 +28,8 @@ Statuswechsel ──► Kuzo-Plugin ──► Shopware_Components_Document::init
   (Lieferschein usw.) und die Vorschau laufen unverändert über Shopware.
 * Fehlt eine Pflichtangabe, entsteht standardmäßig das normale PDF und der Fehler landet im Plugin-Log
   (`var/log/plugin_*.log`). Die Automatik bricht dadurch nicht ab.
-* Beträge: Bei Brutto-Bestellungen bleibt der Bruttobetrag je Steuersatz exakt erhalten, die XML-Summe entspricht also dem PDF.
-  Bei Netto-Bestellungen wird die Steuer wie in Shopware positionsweise gerundet. Weicht die XML-Summe
-  vom Bestellbetrag ab, schreibt das Plugin eine Warnung ins Log.
+* Beträge: Das Plugin rundet wie Shopware positionsweise. Netto, MwSt und Gesamtbetrag der XML stimmen so centgenau
+  mit dem Rechnungs-PDF überein. Weicht die XML-Summe vom Bestellbetrag ab, schreibt das Plugin eine Warnung ins Log.
 
 ## Inhalt der XML
 
@@ -109,7 +108,17 @@ Stand der Entwicklung: Alle Testfälle (brutto, netto/B2B, EU steuerfrei, Export
 das CII-D16B-XSD und die offizielle EN-16931-Schematron ohne Fehler und Warnungen. Der Behörden-Fall besteht zusätzlich die
 XRechnung-3.0-Schematron der KoSIT (v2.6.0). Die Einbettung (PDF/A-3-Kennung,
 `/AF`, `/EmbeddedFiles`, OutputIntent, XMP) ist geprüft, die eingebettete XML ist byte-identisch.
-**Noch offen: ein Test im echten Shop mit Kuzo und eine veraPDF-Prüfung mit dem echten Rechnungs-Template.**
+**In echtem Shopware 5.7.19 getestet** (Testsystem unter [`testsystem/`](testsystem/README.md)): Eine Rechnung,
+erzeugt über `Shopware_Components_Document::initDocument()->render()` wie bei Kuzo, enthält die `factur-x.xml`. Netto,
+MwSt und Gesamtbetrag stimmen mit dem PDF überein, und die XML ist gültig. Mit Leitweg-ID entsteht eine gültige XRechnung,
+die zusätzlich gespeichert wird und im Backend herunterladbar ist.
+**Noch offen: ein Test mit Kuzo und dem eigenen Shop-Dump sowie eine veraPDF-Prüfung mit dem echten Rechnungs-Template.**
+
+## Testsystem
+
+Unter [`testsystem/`](testsystem/README.md) liegt eine Docker-Umgebung (`sw5-entwicklung`), in die du Dateien und
+Datenbank-Dump des Live-Shops einspielst. Der Shop hat dort keinen Internetzugang, Mails landen in Mailpit, und das
+Plugin wird automatisch installiert.
 
 ## Bekannte Grenzen und Hinweise
 

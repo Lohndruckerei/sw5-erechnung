@@ -1,0 +1,6 @@
+# Optional: Shop-Container bekommt Internetzugang (z. B. für Lizenzprüfungen von Plugins).
+# Achtung: Dann können Plugins echte externe Aktionen auslösen (Zahlungen erfassen, ERP, Versandlabels ...).
+# Aktivieren in .env:  COMPOSE_FILE=docker-compose.yml:docker-compose.internet.yml
+services:
+  app:
+    networks: [internal, public]

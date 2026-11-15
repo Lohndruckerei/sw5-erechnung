@@ -6,9 +6,8 @@ namespace LdZugferd\Components;
  * Berechnet Positions-, Steuer- und Summenbeträge so, dass sie die Rechenregeln
  * der EN 16931 (BR-CO-10 ... BR-CO-16, BR-S-08/09) einhalten.
  *
- * Bei Brutto-Bestellungen bleibt der Bruttobetrag je Steuersatz exakt erhalten
- * (= Betrag auf dem PDF). Netto-Basis und Steuer werden pro Steuersatz
- * berechnet und Rundungsdifferenzen auf die größte Position verteilt.
+ * Die Rechnung folgt Shopware (positionsweise Rundung), damit Netto, MwSt und Gesamtbetrag
+ * der XML centgenau mit dem Rechnungs-PDF übereinstimmen.
  *
  * Eingabe je Position:
  *   name, sku, quantity, unitCode, gross (Zeilenbetrag brutto), net (Zeilenbetrag netto),
@@ -21,7 +20,7 @@ class TotalsCalculator
      *
      * @return array{lines: array, taxes: array, totals: array}
      */
-    public function calculate(array $lines, bool $netPrices): array
+    public function calculate(array $lines): array
     {
         $groups = [];
         foreach ($lines as $index => $line) {
@@ -55,31 +54,15 @@ class TotalsCalculator
             $lineNetSum = round($lineNetSum, 2);
             $grossSum = round($grossSum, 2);
 
-            if ($netPrices || $rate == 0.0) {
-                $basis = $lineNetSum;
-                $tax = round($basis * $rate / 100, 2);
-                // Shopware rundet die Steuer bei Netto-Bestellungen positionsweise (Summe brutto - netto).
-                // Diesen Wert übernehmen, damit XML und PDF centgenau übereinstimmen
-                // (BR-S-09 erlaubt eine Toleranz von 1,00).
-                $lineTax = round($grossSum - $lineNetSum, 2);
-                if ($grossSum != 0.0 && abs($lineTax - $tax) < 0.5) {
-                    $tax = $lineTax;
-                }
-            } else {
-                $basis = round($grossSum * 100 / (100 + $rate), 2);
-                $tax = round($grossSum - $basis, 2);
-            }
-
-            // Rundungsdifferenz auf die betragsmäßig größte Position der Gruppe legen (BR-S-08).
-            $diff = round($basis - $lineNetSum, 2);
-            if ($diff != 0.0) {
-                $target = $group['indexes'][0];
-                foreach ($group['indexes'] as $i) {
-                    if (abs($lines[$i]['net']) > abs($lines[$target]['net'])) {
-                        $target = $i;
-                    }
-                }
-                $lines[$target]['net'] = round($lines[$target]['net'] + $diff, 2);
+            // Wie Shopware: Netto-Basis = Summe der (gerundeten) Positions-Nettobeträge,
+            // Steuer = Summe brutto - Summe netto (positionsweise Rundung). So stimmen Netto, MwSt und
+            // Gesamtbetrag der XML centgenau mit dem PDF überein. BR-S-09 (Steuer = Basis x Satz)
+            // erlaubt eine Toleranz von 1,00; bei größeren Abweichungen wird die Steuer neu berechnet.
+            $basis = $lineNetSum;
+            $tax = round($basis * $rate / 100, 2);
+            $lineTax = round($grossSum - $lineNetSum, 2);
+            if ($grossSum != 0.0 && abs($lineTax - $tax) < 0.5) {
+                $tax = $lineTax;
             }
 
             $taxes[] = [

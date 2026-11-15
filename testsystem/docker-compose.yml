@@ -1,0 +1,78 @@
+# Shopware-5-Testsystem für einen Dump des Live-Shops.
+# Bedienung über ./testsystem.sh (siehe README.md).
+name: sw5-entwicklung
+
+services:
+  app:
+    container_name: sw5-entwicklung
+    build:
+      context: ./docker
+      args:
+        PHP_VERSION: ${PHP_VERSION:-7.4}
+        HOST_UID: ${HOST_UID:-1000}
+        HOST_GID: ${HOST_GID:-1000}
+        INSTALL_IONCUBE: ${INSTALL_IONCUBE:-1}
+    volumes:
+      - ${SHOP_DIR:-./shop}:/var/www/html
+      - ./docker/config.php:/var/www/html/config.php:ro
+      - ../LdZugferd:/var/www/html/custom/plugins/LdZugferd
+      - ./docker/create-document.php:/opt/testsystem/create-document.php:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    # Nur internes Netz: Der Shop kann keine externen Dienste erreichen
+    # (Zahlungsanbieter, ERP, Versanddienstleister, Lizenzserver ...). Siehe docker-compose.internet.yml.
+    networks: [internal]
+
+  db:
+    container_name: sw5-entwicklung-db
+    image: ${DB_IMAGE:-mysql:8.0}
+    command:
+      - --sql-mode=NO_ENGINE_SUBSTITUTION
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-allowed-packet=512M
+      - --innodb-buffer-pool-size=512M
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: shopware
+      MYSQL_USER: shopware
+      MYSQL_PASSWORD: shopware
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [internal]
+
+  # Fängt alle Mails ab: http://localhost:8025
+  mailpit:
+    container_name: sw5-entwicklung-mailpit
+    image: axllent/mailpit:v1.21.8
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${MAIL_PORT:-8025}:8025"
+    networks: [internal, public]
+
+  # Einziger Zugang von außen zum Shop: http://localhost:8080
+  proxy:
+    container_name: sw5-entwicklung-proxy
+    image: nginx:1.27-alpine
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${HTTP_PORT:-8080}:80"
+    depends_on: [app]
+    networks: [internal, public]
+
+networks:
+  internal:
+    internal: true
+  public: {}
+
+volumes:
+  db-data:

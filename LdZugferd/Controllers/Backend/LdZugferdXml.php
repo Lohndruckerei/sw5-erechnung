@@ -18,7 +18,9 @@ class Shopware_Controllers_Backend_LdZugferdXml extends Shopware_Controllers_Bac
 
     public function downloadAction()
     {
+        // Wie Shopware_Controllers_Backend_Order::openPdfAction: View- und JSON-Renderer abschalten
         $this->Front()->Plugins()->ViewRenderer()->setNoRender();
+        $this->Front()->Plugins()->Json()->setRenderer(false);
 
         $connection = $this->container->get('dbal_connection');
         $documentId = (int) $this->Request()->getParam('documentId');

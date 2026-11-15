@@ -49,7 +49,7 @@ foreach ($lines as &$l) {
 }
 unset($l);
 
-$calc = (new TotalsCalculator())->calculate($lines, $net);
+$calc = (new TotalsCalculator())->calculate($lines);
 $totals = $calc['totals'] + ['prepaid' => 0.0];
 $totals['duePayable'] = $totals['grandTotal'];
 

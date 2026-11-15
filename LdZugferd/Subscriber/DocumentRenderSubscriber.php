@@ -74,11 +74,14 @@ class DocumentRenderSubscriber implements SubscriberInterface
         $config = $this->getConfig();
 
         $typeCode = $this->resolveTypeCode($document, $config);
+        // Wichtig: Shopware_Models_Document_Order liefert Werte nur über __get() (kein __isset()),
+        // daher erst in eine Variable lesen – empty($document->_order->id) wäre immer true.
+        $orderId = $document->_order ? (int) $document->_order->id : 0;
         $handle = $renderer === 'pdf'
             && !empty($config['enabled'])
             && $typeCode !== null
             && !$document->_preview
-            && !empty($document->_order->id);
+            && $orderId > 0;
 
         if (!$handle) {
             $args->setReturn($document->executeParent('render', $args->getArgs()));

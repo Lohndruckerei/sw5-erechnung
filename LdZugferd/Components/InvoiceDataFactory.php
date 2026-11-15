@@ -49,7 +49,6 @@ class InvoiceDataFactory
         $buyerCountry = $this->countryIso($billing);
         $shipCountry = $this->countryIso($shipping) ?: $buyerCountry;
         $taxFree = !empty($order['taxfree']);
-        $netPrices = (bool) $docOrder->net;
 
         $issueDate = $this->parseDate(isset($document->_config['date']) ? $document->_config['date'] : null) ?: new DateTimeImmutable('today');
         $deliveryDate = $this->parseDate(isset($document->_config['delivery_date']) ? $document->_config['delivery_date'] : null) ?: $issueDate;
@@ -96,12 +95,13 @@ class InvoiceDataFactory
         }
         unset($line);
 
-        $calc = $this->calculator->calculate($lines, $netPrices);
+        $calc = $this->calculator->calculate($lines);
         $totals = $calc['totals'];
 
         // Zahlung
-        $paymentName = isset($docOrder->payment['name']) ? (string) $docOrder->payment['name'] : '';
-        $paymentLabel = isset($docOrder->payment['description']) ? (string) $docOrder->payment['description'] : $paymentName;
+        $payment = $docOrder->payment; // __get() – nicht direkt mit isset() prüfen
+        $paymentName = isset($payment['name']) ? (string) $payment['name'] : '';
+        $paymentLabel = isset($payment['description']) ? (string) $payment['description'] : $paymentName;
         $isPaid = !empty($config['paidStatusAsPrepaid']) && (int) $order['cleared'] === self::PAYMENT_STATUS_COMPLETELY_PAID;
         $totals['prepaid'] = $isPaid && $typeCode === '380' ? $totals['grandTotal'] : 0.0;
         $totals['duePayable'] = round($totals['grandTotal'] - $totals['prepaid'], 2);

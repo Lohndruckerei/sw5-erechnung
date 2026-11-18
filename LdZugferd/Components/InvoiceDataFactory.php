@@ -65,6 +65,7 @@ class InvoiceDataFactory
             $lines[] = [
                 'sku' => (string) $position['articleordernumber'],
                 'name' => (string) $position['name'],
+                'description' => self::positionDescription($position, isset($config['positionDescriptionField']) ? (string) $config['positionDescriptionField'] : ''),
                 'quantity' => (float) $position['quantity'],
                 'unitCode' => $config['unitCode'] ?: 'H87',
                 'gross' => (float) $position['amount'],
@@ -398,6 +399,32 @@ class InvoiceDataFactory
             'amount' => $amount,
             'label' => $label,
         ];
+    }
+
+    /**
+     * Artikelbeschreibung (BT-154) aus einem Freitextfeld der Bestellposition, z. B. die Konfigurator-Angaben
+     * (Maße, Material, Datei) in attribute1. HTML und Entities werden entfernt, Zeilen bleiben erhalten.
+     */
+    public static function positionDescription(array $position, string $field): string
+    {
+        $field = trim($field);
+        if ($field === '' || empty($position['attributes'][$field]) || !is_scalar($position['attributes'][$field])) {
+            return '';
+        }
+        $text = preg_replace('#<br\s*/?>|</p>|</div>|</li>#i', "\n", (string) $position['attributes'][$field]);
+        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $lines = [];
+        foreach (preg_split('/\R/u', $text) as $line) {
+            $line = trim(preg_replace('/[\s\x{00A0}]+/u', ' ', $line));
+            // Leere Konfigurator-Vorlage ohne Werte ("Breite: x Höhe: x Stück 1", "Materialtyp:") weglassen
+            $probe = preg_replace('/[\p{L}\-]+:|\bx\b|\bSt(ü|ue)ck\s*\d*|[\s,.;]+/u', '', $line);
+            if ($line !== '' && $probe !== '') {
+                $lines[] = $line;
+            }
+        }
+        $text = implode("\n", $lines);
+
+        return strcasecmp($text, trim((string) $position['name'])) === 0 ? '' : $text;
     }
 
     private static function euro(float $amount): string

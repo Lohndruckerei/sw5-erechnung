@@ -260,6 +260,10 @@ class CiiXmlBuilder
             $this->ram($product, 'SellerAssignedID', $line['sku']);
         }
         $this->ram($product, 'Name', $line['name'] !== '' ? $line['name'] : '-');
+        if (!empty($line['description'])) {
+            // BT-154 Artikelbeschreibung, z. B. Konfigurator-Angaben
+            $this->ram($product, 'Description', $line['description']);
+        }
 
         $agreement = $this->ram($item, 'SpecifiedLineTradeAgreement');
         $price = $this->ram($agreement, 'NetPriceProductTradePrice');

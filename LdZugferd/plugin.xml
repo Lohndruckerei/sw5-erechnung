@@ -3,13 +3,17 @@
         xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/shopware/shopware/5.7/engine/Shopware/Components/Plugin/schema/plugin.xsd">
     <label lang="de">ZUGFeRD / Factur-X E-Rechnung</label>
     <label lang="en">ZUGFeRD / Factur-X e-invoice</label>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
     <copyright>(c) Lohndruckerei</copyright>
     <license>proprietary</license>
     <author>Lohndruckerei</author>
     <description lang="de">Erzeugt Rechnungs-PDFs direkt beim Rendern als ZUGFeRD 2.x / Factur-X (Profil EN 16931, PDF/A-3 mit eingebetteter factur-x.xml). Funktioniert mit allen Plugins, die Belege über die Shopware-Dokumentenkomponente erzeugen.</description>
     <description lang="en">Renders invoice PDFs as ZUGFeRD 2.x / Factur-X (profile EN 16931, PDF/A-3 with embedded factur-x.xml) at creation time.</description>
     <compatibility minVersion="5.6.0" maxVersion="5.7.99"/>
+    <changelog version="1.3.0">
+        <changes lang="de">Konfigurator-Angaben (Freitextfeld der Position, Standard attribute1) stehen als Artikelbeschreibung (BT-154) in der E-Rechnung</changes>
+        <changes lang="en">Configurator details (order position attribute, default attribute1) are written as item description (BT-154)</changes>
+    </changelog>
     <changelog version="1.2.0">
         <changes lang="de">Zahlungsziel und Skonto je Zahlungsart (neue Einstellung). Entfällt ein Zahlungsart-Zuschlag bei schneller Zahlung, steht der Abzug maschinenlesbar (#SKONTO#) und als Text in der E-Rechnung; "0 Tage" = zahlbar sofort</changes>
         <changes lang="en">Payment terms and cash discount per payment method (new setting). A payment surcharge waived for early payment is written as machine-readable cash discount (#SKONTO#) and as text; "0 days" = due immediately</changes>

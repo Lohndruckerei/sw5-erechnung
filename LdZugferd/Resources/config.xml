@@ -183,6 +183,13 @@ paypal=68
             <description lang="de">Optional, falls die Leitweg-ID schon in einem vorhandenen Freitextfeld der Rechnungsadresse steht (Spalte aus s_order_billingaddress_attributes, z. B. "text1"). Das Plugin legt außerdem das Feld "Leitweg-ID (XRechnung)" an Kunde und Adresse an. Ohne Leitweg-ID wird die Bestellnummer als Käuferreferenz verwendet.</description>
         </element>
         <element type="text" scope="shop">
+            <name>positionDescriptionField</name>
+            <label lang="de">Freitextfeld der Position als Artikelbeschreibung</label>
+            <label lang="en">Order position attribute used as item description</label>
+            <value>attribute1</value>
+            <description lang="de">Spalte aus s_order_details_attributes, deren Inhalt als Artikelbeschreibung (BT-154) in die E-Rechnung kommt, z. B. "attribute1" mit den Konfigurator-Angaben (Maße, Material, Datei). Leer lassen zum Abschalten.</description>
+        </element>
+        <element type="text" scope="shop">
             <name>unitCode</name>
             <label lang="de">Standard-Mengeneinheit (UN/ECE Rec. 20)</label>
             <label lang="en">Default unit code</label>

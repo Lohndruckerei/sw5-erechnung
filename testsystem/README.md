@@ -97,6 +97,13 @@ Voraussetzung: Docker mit Docker Compose. Unter Windows `testsystem.sh` in WSL o
    ```bash
    ./testsystem.sh admin          # test / test1234test
    ```
+   **Als Kunde im Shop anmelden:** Nach dem Import sind alle Kunden-E-Mails anonymisiert
+   (`kunde-<id>@example.invalid`), mit echten Adressen klappt die Anmeldung daher nicht. Testkunden anlegen:
+   ```bash
+   ./testsystem.sh kunde          # testkunde@example.invalid (Firma) und
+                                  # testbehoerde@example.invalid (Behörde mit Leitweg-ID -> XRechnung), Passwort test1234test
+   ```
+   Nach einem erneuten Import nochmals ausführen.
 
 ## E-Rechnung testen
 
@@ -117,6 +124,7 @@ Voraussetzung: Docker mit Docker Compose. Unter Windows `testsystem.sh` in WSL o
 ./testsystem.sh import <dump>         Dump (.sql, .sql.gz, .zip) einspielen; löscht die bisherige Testdatenbank
 ./testsystem.sh refresh               Caches leeren, Plugins neu einlesen, LdZugferd installieren/aktualisieren
 ./testsystem.sh admin [user] [pass]   Backend-Benutzer anlegen
+./testsystem.sh kunde [pass]          Testkunden für die Shop-Anmeldung anlegen (Firma + Behörde)
 ./testsystem.sh rechnung <bestellnr>  Rechnung erzeugen wie Kuzo/Backend
 ./testsystem.sh console <befehl>      Shopware-Konsole, z. B. console sw:plugin:list
 ./testsystem.sh shell                 Shell im Shop-Container

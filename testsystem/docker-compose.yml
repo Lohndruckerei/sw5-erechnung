@@ -18,6 +18,10 @@ services:
       - ../LdZugferd:/var/www/html/custom/plugins/LdZugferd
       - ./docker/create-document.php:/opt/testsystem/create-document.php:ro
       - ./docker/check-einvoice.php:/opt/testsystem/check-einvoice.php:ro
+      - ./docker/apache-intern.conf:/etc/apache2/conf-enabled/zz-testsystem-intern.conf:ro
+    environment:
+      # Port, unter dem der Shop sich selbst aufruft (Logo im Rechnungs-PDF). Darf nicht 80 sein.
+      SHOP_INTERNAL_PORT: ${HTTP_PORT:-8080}
     depends_on:
       db:
         condition: service_healthy

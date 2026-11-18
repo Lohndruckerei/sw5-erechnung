@@ -41,7 +41,8 @@ Statuswechsel ──► Kuzo-Plugin ──► Shopware_Components_Document::init
 | Lieferanschrift | Lieferadresse der Bestellung |
 | Positionen inkl. Versand, Gutscheine/Rabatte (als Negativmenge) | Bestellpositionen |
 | Steuer | S (Standard), K (innergem. Lieferung), G (Export), Z/E |
-| Zahlung | Zahlungsart → UNTDID-4461-Code (konfigurierbar), IBAN/BIC, Zahlungsziel, „bereits bezahlt“ bei Zahlstatus 12 |
+| Zahlung | Zahlungsart → UNTDID-4461-Code (konfigurierbar), IBAN/BIC, „bereits bezahlt“ bei Zahlstatus 12 |
+| Zahlungsziel / Skonto | je Zahlungsart einstellbar („Zahlungsziel und Skonto je Zahlungsart“, z. B. `invoice2=30;skonto=5`, `invoice3=14`, `prepayment=0`). `;skonto=5` = der Zahlungsart-Zuschlag (Position `sw-payment…`, z. B. Finanzierungskostenzuschlag) entfällt bei Zahlung in 5 Tagen, `;skonto=10:2` = 2 % Skonto. Steht in BT-20 maschinenlesbar (`#SKONTO#TAGE=5#PROZENT=100.00#BASISBETRAG=13.08#`, XRechnung BR-DE-18) und als Text mit beiden Daten und Zahlbeträgen. Sonst gilt „Zahlungsziel in Tagen“. |
 | Gutschrift/Storno (optional) | Typ 381 mit Verweis auf die Ursprungsrechnung |
 | Käuferreferenz (BT-10) | Leitweg-ID, sonst Bestellnummer |
 

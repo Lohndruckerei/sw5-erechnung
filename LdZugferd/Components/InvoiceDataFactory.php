@@ -106,17 +106,38 @@ class InvoiceDataFactory
         $totals['prepaid'] = $isPaid && $typeCode === '380' ? $totals['grandTotal'] : 0.0;
         $totals['duePayable'] = round($totals['grandTotal'] - $totals['prepaid'], 2);
 
-        $dueDate = $issueDate->modify('+' . (int) $config['paymentTermDays'] . ' days');
+        $termRule = self::paymentTermRule($paymentName, isset($config['paymentTermsMapping']) ? (string) $config['paymentTermsMapping'] : '');
+        $termDays = $termRule ? $termRule['days'] : (int) $config['paymentTermDays'];
+        $dueDate = $issueDate->modify('+' . $termDays . ' days');
         $paymentCode = $this->paymentMeansCode($paymentName, $config);
         if (in_array($paymentCode, ['30', '58'], true) && empty($config['sellerIban'])) {
             // Überweisung ohne IBAN wäre ungültig (BR-61)
             $paymentCode = '1';
         }
 
+        $discount = null;
+        if ($typeCode === '380' && $totals['prepaid'] == 0 && $totals['grandTotal'] > 0 && $termRule && $termRule['discountDays'] !== null) {
+            $discount = $this->discount($termRule, $lines, $totals['grandTotal'], $issueDate);
+        }
+
         if ($typeCode !== '380') {
             $terms = null;
         } elseif ($totals['prepaid'] > 0) {
             $terms = 'Bereits bezahlt' . ($paymentLabel !== '' ? ' (' . $paymentLabel . ')' : '') . '.';
+        } elseif ($discount) {
+            // Erste Zeile: Skonto maschinenlesbar nach XRechnung (BT-20, BR-DE-18), danach Klartext
+            $terms = sprintf("#SKONTO#TAGE=%d#PROZENT=%s#BASISBETRAG=%s#\n", $discount['days'], number_format($discount['percent'], 2, '.', ''), number_format($discount['basis'], 2, '.', ''))
+                . sprintf(
+                    'Bei Zahlung bis %s abzüglich %s %s, Zahlbetrag %s. Sonst zahlbar bis %s ohne Abzug (%s).',
+                    $discount['date']->format('d.m.Y'),
+                    $discount['label'],
+                    self::euro($discount['amount']),
+                    self::euro($totals['grandTotal'] - $discount['amount']),
+                    $dueDate->format('d.m.Y'),
+                    self::euro($totals['grandTotal'])
+                );
+        } elseif ($termDays === 0) {
+            $terms = 'Zahlbar sofort ohne Abzug.';
         } else {
             $terms = 'Zahlbar bis ' . $dueDate->format('d.m.Y') . ' ohne Abzug.';
         }
@@ -306,6 +327,82 @@ class InvoiceDataFactory
         }
 
         return trim((string) $config['defaultPaymentMeansCode']) ?: '1';
+    }
+
+    /**
+     * Regel aus "Zahlungsziel und Skonto je Zahlungsart" für eine Zahlungsart (technischer Name, exakt):
+     *   invoice2=30;skonto=5      30 Tage, Zahlungsart-Zuschlag entfällt bei Zahlung in 5 Tagen
+     *   invoice=30;skonto=10:2    30 Tage, 2 % Skonto bei Zahlung in 10 Tagen
+     *   prepayment=0              zahlbar sofort
+     *
+     * @return array{days:int, discountDays:?int, discountPercent:?float}|null
+     */
+    public static function paymentTermRule(string $paymentName, string $mapping)
+    {
+        foreach (preg_split('/\R/', $mapping) as $line) {
+            if (!preg_match('/^\s*([^=\s]+)\s*=\s*(\d+)\s*(?:;\s*skonto\s*=\s*(\d+)\s*(?::\s*(\d+(?:[.,]\d+)?)\s*%?)?)?\s*$/i', $line, $m)) {
+                continue;
+            }
+            if (strcasecmp($m[1], $paymentName) !== 0) {
+                continue;
+            }
+
+            return [
+                'days' => (int) $m[2],
+                'discountDays' => isset($m[3]) && $m[3] !== '' ? (int) $m[3] : null,
+                'discountPercent' => isset($m[4]) && $m[4] !== '' ? (float) str_replace(',', '.', $m[4]) : null,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Skonto berechnen. Ohne Prozentsatz entfällt der Zahlungsart-Zuschlag (Positionen "sw-payment..."):
+     * Abzug = Gesamtbetrag mit Zuschlag - Gesamtbetrag ohne Zuschlag (inkl. MwSt, centgenau).
+     */
+    private function discount(array $rule, array $lines, float $grandTotal, DateTimeImmutable $issueDate)
+    {
+        if ($rule['discountPercent'] === null) {
+            $rest = [];
+            $label = '';
+            foreach ($lines as $line) {
+                if (stripos($line['sku'], 'sw-payment') === 0) {
+                    $label = $label ?: $line['name'];
+                    continue;
+                }
+                $rest[] = $line;
+            }
+            if ($label === '' || !$rest) {
+                return null; // kein Zuschlag in dieser Bestellung -> nichts abzuziehen
+            }
+            $amount = round($grandTotal - $this->calculator->calculate($rest)['totals']['grandTotal'], 2);
+            $percent = 100.0;
+            $basis = $amount;
+        } else {
+            $percent = $rule['discountPercent'];
+            $basis = $grandTotal;
+            $amount = round($grandTotal * $percent / 100, 2);
+            $label = number_format($percent, 2, ',', '') . ' % Skonto';
+            $label = str_replace(',00 %', ' %', $label);
+        }
+        if ($amount <= 0) {
+            return null;
+        }
+
+        return [
+            'days' => $rule['discountDays'],
+            'date' => $issueDate->modify('+' . $rule['discountDays'] . ' days'),
+            'percent' => $percent,
+            'basis' => $basis,
+            'amount' => $amount,
+            'label' => $label,
+        ];
+    }
+
+    private static function euro(float $amount): string
+    {
+        return number_format(round($amount, 2), 2, ',', '.') . ' €';
     }
 
     private function findPrecedingInvoice(int $orderId, array $config)

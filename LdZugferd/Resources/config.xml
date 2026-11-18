@@ -133,6 +133,19 @@
             <label lang="de">Zahlungsziel in Tagen</label>
             <label lang="en">Payment term (days)</label>
             <value>14</value>
+            <description lang="de">Gilt für Zahlungsarten, die unten nicht aufgeführt sind.</description>
+        </element>
+        <element type="textarea" scope="shop">
+            <name>paymentTermsMapping</name>
+            <label lang="de">Zahlungsziel und Skonto je Zahlungsart</label>
+            <label lang="en">Payment terms per payment method</label>
+            <value>invoice2=30;skonto=5
+invoice3=14
+prepayment=0
+SwagPaymentPayPalUnified=0
+mollie_creditcard=0
+</value>
+            <description lang="de">Je Zeile "technischer Name der Zahlungsart=Tage" (0 = zahlbar sofort). Zusatz ";skonto=5": Der Zahlungsart-Zuschlag (z. B. Finanzierungskostenzuschlag) entfällt bei Zahlung innerhalb von 5 Tagen. Zusatz ";skonto=10:2": 2 % Skonto bei Zahlung innerhalb von 10 Tagen. Das Skonto steht maschinenlesbar in der E-Rechnung (#SKONTO#...). Bereits bezahlte Bestellungen werden als "bereits bezahlt" ausgewiesen.</description>
         </element>
         <element type="textarea" scope="shop">
             <name>paymentMeansMapping</name>

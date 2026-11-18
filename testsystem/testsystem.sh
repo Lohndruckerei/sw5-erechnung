@@ -131,8 +131,13 @@ after_change() {
     disable_https_redirect
     compose exec -T app sh -c 'rm -rf var/cache/production_* var/cache/*.php web/cache/*.css web/cache/*.js 2>/dev/null; mkdir -p var/cache var/log web/cache files media; chown -R www-data: var web/cache files 2>/dev/null || true'
     console sw:plugin:refresh || true
-    if console sw:plugin:list 2>/dev/null | grep -q "LdZugferd"; then
-        console sw:plugin:install --activate LdZugferd || console sw:plugin:update LdZugferd || true
+    # Ausgabe erst einsammeln: "grep -q" bricht die Pipe ab, mit pipefail galt das als Fehler
+    local plugins
+    plugins=$(console sw:plugin:list 2>/dev/null || true)
+    if grep -q "LdZugferd" <<<"$plugins"; then
+        # install meldet "bereits installiert" ohne Fehler -> Update immer zusätzlich (neue Version, neue Einstellungen)
+        console sw:plugin:install --activate LdZugferd >/dev/null 2>&1 || true
+        console sw:plugin:update LdZugferd || true
     fi
     console sw:cache:clear || true
     console sw:theme:cache:generate || true
@@ -142,6 +147,48 @@ cmd_admin() {
     local user="${1:-test}" pass="${2:-test1234test}"
     console sw:admin:create --username="$user" --password="$pass" --email="$user@example.invalid" --name="Testsystem" --locale=de_DE -n
     echo "Backend-Login: $user / $pass"
+}
+
+# Testkunden für die Anmeldung im Shop anlegen (nach dem Import sind alle echten Kunden-E-Mails anonymisiert).
+# Kopiert die Einstellungen (Kundengruppe, Zahlart, Shop) des neuesten echten Kunden. Erneuter Aufruf legt neu an.
+create_customer() {
+    local email="$1" pass="$2" number="$3" company="$4" first="$5" last="$6" leitweg="$7" hash
+    hash=$(compose exec -T -e P="$pass" app php -r 'echo password_hash(getenv("P"), PASSWORD_BCRYPT);')
+    {
+        printf "SET @email='%s', @hash='%s', @nr='%s', @company='%s', @first='%s', @last='%s', @leitweg='%s';\n" \
+            "$email" "$hash" "$number" "$company" "$first" "$last" "$leitweg"
+        cat <<'SQL'
+SET @old = (SELECT id FROM s_user WHERE email = @email LIMIT 1);
+DELETE FROM s_user_addresses WHERE user_id = @old;
+DELETE FROM s_user_attributes WHERE userID = @old;
+DELETE FROM s_user WHERE id = @old;
+SET @tpl = (SELECT id FROM s_user WHERE accountmode = 0 AND active = 1 AND email LIKE 'kunde-%@example.invalid' ORDER BY id DESC LIMIT 1);
+DROP TEMPORARY TABLE IF EXISTS tmp_kunde;
+CREATE TEMPORARY TABLE tmp_kunde AS SELECT * FROM s_user WHERE id = @tpl;
+UPDATE tmp_kunde SET id = 0, email = @email, password = @hash, encoder = 'bcrypt', active = 1, accountmode = 0,
+    firstlogin = CURDATE(), lastlogin = NOW(), sessionID = '', failedlogins = 0, lockeduntil = NULL, newsletter = 0,
+    salutation = 'mr', firstname = @first, lastname = @last, customernumber = @nr, subshopID = 1, language = '1',
+    default_billing_address_id = NULL, default_shipping_address_id = NULL;
+INSERT INTO s_user SELECT * FROM tmp_kunde;
+SET @uid = LAST_INSERT_ID();
+INSERT INTO s_user_addresses (user_id, company, salutation, firstname, lastname, street, zipcode, city, country_id, phone)
+VALUES (@uid, @company, 'mr', @first, @last, 'Teststraße 1', '90441', 'Nürnberg',
+        (SELECT id FROM s_core_countries WHERE countryiso = 'DE' LIMIT 1), '0911 000000');
+SET @aid = LAST_INSERT_ID();
+UPDATE s_user SET default_billing_address_id = @aid, default_shipping_address_id = @aid WHERE id = @uid;
+INSERT INTO s_user_attributes (userID, ld_leitweg_id) VALUES (@uid, NULLIF(@leitweg, ''));
+DROP TEMPORARY TABLE tmp_kunde;
+SQL
+    } | mysql_root --default-character-set=utf8mb4 shopware
+    echo "  $email / $pass  ($company${leitweg:+, Leitweg-ID $leitweg})"
+}
+
+cmd_kunde() {
+    local pass="${1:-test1234test}"
+    echo "Testkunden für http://${SHOP_HOST}/account :"
+    create_customer testkunde@example.invalid "$pass" TEST-1 "Testfirma GmbH" Test Kunde ""
+    # Behörde mit offizieller Test-Leitweg-ID -> Rechnungen werden als XRechnung erzeugt
+    create_customer testbehoerde@example.invalid "$pass" TEST-2 "Testamt der Stadt Nürnberg" Test Behoerde 991-33333TEST-33
 }
 
 cmd_rechnung() {
@@ -241,6 +288,7 @@ cmd_help() {
 ./testsystem.sh import <dump>         Datenbank-Dump (.sql, .sql.gz, .zip) einspielen und Testsystem vorbereiten
 ./testsystem.sh refresh               Caches leeren, Plugins neu einlesen, LdZugferd installieren/aktualisieren
 ./testsystem.sh admin [user] [pass]   Backend-Benutzer anlegen (Standard: test / test1234test)
+./testsystem.sh kunde [pass]          Testkunden für die Shop-Anmeldung anlegen (Firma + Behörde mit Leitweg-ID)
 ./testsystem.sh rechnung <bestellnr>  Rechnung erzeugen wie Kuzo/Backend (Test des E-Rechnungs-Plugins)
 ./testsystem.sh console <befehl>      Shopware-Konsole, z. B. ./testsystem.sh console sw:plugin:list
 ./testsystem.sh shell                 Shell im Shop-Container
@@ -257,6 +305,7 @@ case "${1:-help}" in
     import) shift; cmd_import "$@" ;;
     refresh) after_change ;;
     admin) shift; cmd_admin "$@" ;;
+    kunde) shift; cmd_kunde "$@" ;;
     rechnung) shift; cmd_rechnung "$@" ;;
     console) shift; console "$@" ;;
     shell) compose exec -u www-data app bash ;;

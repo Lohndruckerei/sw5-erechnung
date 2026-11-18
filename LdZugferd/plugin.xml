@@ -3,13 +3,17 @@
         xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/shopware/shopware/5.7/engine/Shopware/Components/Plugin/schema/plugin.xsd">
     <label lang="de">ZUGFeRD / Factur-X E-Rechnung</label>
     <label lang="en">ZUGFeRD / Factur-X e-invoice</label>
-    <version>1.1.1</version>
+    <version>1.1.2</version>
     <copyright>(c) Lohndruckerei</copyright>
     <license>proprietary</license>
     <author>Lohndruckerei</author>
     <description lang="de">Erzeugt Rechnungs-PDFs direkt beim Rendern als ZUGFeRD 2.x / Factur-X (Profil EN 16931, PDF/A-3 mit eingebetteter factur-x.xml). Funktioniert mit allen Plugins, die Belege über die Shopware-Dokumentenkomponente erzeugen.</description>
     <description lang="en">Renders invoice PDFs as ZUGFeRD 2.x / Factur-X (profile EN 16931, PDF/A-3 with embedded factur-x.xml) at creation time.</description>
     <compatibility minVersion="5.6.0" maxVersion="5.7.99"/>
+    <changelog version="1.1.2">
+        <changes lang="de">Fix: Ungültige USt-ID des Kunden (z. B. "*", Steuernummer, Text) wird nicht mehr in die E-Rechnung übernommen (BR-CO-09); deutsche USt-IdNr. ohne "DE" wird ergänzt</changes>
+        <changes lang="en">Fix: invalid buyer VAT ID (e.g. "*", tax number, text) is no longer written to the e-invoice (BR-CO-09); German VAT ID without "DE" prefix is completed</changes>
+    </changelog>
     <changelog version="1.1.1">
         <changes lang="de">Fix: Plugin griff in echtem Shopware nicht (Bestell-ID-Prüfung); Beträge jetzt centgenau wie im PDF (positionsweise Rundung); XML-Download liefert die Datei statt JSON</changes>
         <changes lang="en">Fix: plugin did not trigger in real Shopware (order id check); amounts now match the PDF exactly (line-wise rounding); XML download returns the file instead of JSON</changes>

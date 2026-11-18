@@ -23,8 +23,13 @@ compose() { docker compose "$@"; }
 
 # Images laden (mit Wiederholung bei Docker-Hub-Limits), dann bauen und starten
 compose_up() {
-    local try
+    local try img missing=0
+    # Sind alle fertigen Images (db, mailpit, proxy) schon da, wird Docker Hub gar nicht erst gefragt
+    for img in $(compose config --images 2>/dev/null | grep -v -- '-app$'); do
+        docker image inspect "$img" >/dev/null 2>&1 || missing=1
+    done
     for try in 1 2 3 4 5; do
+        [ "$missing" = 0 ] && break
         compose pull --ignore-buildable --quiet && break
         [ "$try" = 5 ] && { echo "Images konnten nicht geladen werden (Docker Hub). Später erneut versuchen."; exit 1; }
         echo "Docker Hub antwortet nicht (Versuch $try/5), neuer Versuch in $((try * 30)) s ..."
@@ -66,8 +71,26 @@ check_shop_dir() {
     fi
 }
 
+# Die .htaccess des Live-Shops leitet oft auf https um; das Testsystem hat nur http.
+# Umleitungen auf https:// (samt ihren RewriteCond-Zeilen) auskommentieren, Original bleibt als .htaccess.live.
+disable_https_redirect() {
+    local f="$SHOP_DIR/.htaccess"
+    [ -f "$f" ] && grep -q '^[[:space:]]*RewriteRule.*https://' "$f" || return 0
+    echo "Schalte die HTTPS-Umleitung in $f ab (Original: .htaccess.live) ..."
+    cp -p "$f" "$f.live"
+    awk '{ l[NR] = $0 }
+         END {
+             for (i = 1; i <= NR; i++) if (l[i] ~ /^[[:space:]]*RewriteRule.*https:\/\//) {
+                 l[i] = "#testsystem# " l[i]
+                 for (j = i - 1; j > 0 && l[j] ~ /^[[:space:]]*RewriteCond/; j--) l[j] = "#testsystem# " l[j]
+             }
+             for (i = 1; i <= NR; i++) print l[i]
+         }' "$f.live" > "$f"
+}
+
 cmd_start() {
     check_shop_dir
+    disable_https_redirect
     compose_up
     wait_for_db
     echo
@@ -105,6 +128,7 @@ cmd_import() {
 
 # Caches leeren, Plugins neu einlesen, LdZugferd installieren, Theme kompilieren
 after_change() {
+    disable_https_redirect
     compose exec -T app sh -c 'rm -rf var/cache/production_* var/cache/*.php web/cache/*.css web/cache/*.js 2>/dev/null; mkdir -p var/cache var/log web/cache files media; chown -R www-data: var web/cache files 2>/dev/null || true'
     console sw:plugin:refresh || true
     if console sw:plugin:list 2>/dev/null | grep -q "LdZugferd"; then

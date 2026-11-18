@@ -168,7 +168,7 @@ class InvoiceDataFactory
                 'zip' => (string) $billing['zipcode'],
                 'city' => (string) $billing['city'],
                 'country' => $buyerCountry,
-                'vatId' => $this->normalizeVatId($billing['ustid']),
+                'vatId' => self::buyerVatId($billing['ustid'], $buyerCountry),
                 'email' => isset($user['email']) ? (string) $user['email'] : '',
                 'phone' => isset($billing['phone']) ? (string) $billing['phone'] : '',
                 // BT-49: Bei Behörden ist die Leitweg-ID die elektronische Adresse (Schema 0204)
@@ -339,6 +339,21 @@ class InvoiceDataFactory
     private function normalizeVatId($vatId): string
     {
         return strtoupper(preg_replace('/[\s.\-]/', '', (string) $vatId));
+    }
+
+    /**
+     * USt-ID des Käufers (BT-48) nur übernehmen, wenn sie wie eine USt-ID aussieht (Länderpräfix + 2-12 Zeichen,
+     * BR-CO-09). Kunden tragen oft "*", Steuernummern oder Text ein; das würde die E-Rechnung ungültig machen.
+     * Deutsche USt-IdNr. ohne Präfix (genau 9 Ziffern) bekommt "DE" vorangestellt.
+     */
+    public static function buyerVatId($vatId, string $country): string
+    {
+        $id = strtoupper(preg_replace('/[\s.\-]/', '', (string) $vatId));
+        if ($country === 'DE' && preg_match('/^\d{9}$/', $id)) {
+            $id = 'DE' . $id;
+        }
+
+        return preg_match('/^[A-Z]{2}[0-9A-Z+*]{2,12}$/', $id) ? $id : '';
     }
 
     /**

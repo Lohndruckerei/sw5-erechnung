@@ -1,6 +1,9 @@
 # Kundendaten und lokale Einstellungen nie ins Repository
 .env
+.env.*
+!.env.example
 shop/
+shop-*/
 *.sql
 *.sql.gz
 *.zip

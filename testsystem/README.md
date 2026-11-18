@@ -46,11 +46,34 @@ Voraussetzung: Docker mit Docker Compose. Unter Windows `testsystem.sh` in WSL o
    cd testsystem
    cp .env.example .env
    ```
-   In `.env` vor allem **`PHP_VERSION` auf die PHP-Version des Live-Servers** setzen (`php -v` auf dem Server).
-   Verschlüsselte Plugins (ionCube) laufen nur mit passender PHP-Version.
+   In `.env` vor allem **`PHP_VERSION` auf die PHP-Version des Live-Shops** setzen. Maßgeblich ist die Version, mit
+   der die Website läuft (Hoster-Panel); `php -v` per SSH zeigt oft eine andere (bei displayhaus.de: SSH 8.2, Shop 7.4).
+   Verschlüsselte Plugins (ionCube) laufen nur mit passender PHP-Version. Meldung „encoded by the ionCube Encoder for
+   PHP 7.4“ heißt: `PHP_VERSION=7.4`.
    Unter Linux `HOST_UID`/`HOST_GID` auf die Ausgabe von `id -u` / `id -g` setzen.
 
-2. **Shop-Dateien kopieren** (Webroot des Live-Shops nach `testsystem/shop/`), zum Beispiel:
+2. **Mit SSH-Zugang: Dateien und Datenbank in einem Schritt holen** (ersetzt Schritt 2 und 3):
+   Einmalig in `~/.ssh/config` (WSL/Ubuntu) den Kurznamen `displayhaus` anlegen:
+   ```
+   Host displayhaus
+       HostName displayhaus.de
+       User discfyxp
+       IdentityFile ~/.ssh/displayhaus
+   ```
+   (Bei „message authentication code incorrect“ zusätzlich `MACs hmac-sha2-256` und `Ciphers aes256-ctr`.)
+   Dann:
+   ```bash
+   mv shop shop-demo          # nur falls hier noch der Demo-Shop liegt
+   ./live-holen.sh            # später erneut: ./live-holen.sh aktualisieren
+   ```
+   Vorgaben im Skript: Shop-Ordner `/home/discfyxp/www.displayhaus.de`, nicht kopiert werden `dev/`,
+   `files/basketUploads/final/`, `files/backup/` sowie `var/cache`, `web/cache`, `var/log`.
+   Das Skript liest auf dem Server die Datenbank-Zugangsdaten aus der `config.php` (sie werden nicht angezeigt),
+   holt den Dump als `shop-dump.sql.gz` und kopiert die Dateien per rsync nach `shop/`. Optional:
+   `ohne <ordner>` (weitere Ordner ausschließen), `ziel`, `pfad`, `port` (anderer Server); Hilfe: `./live-holen.sh hilfe`.
+   Am Live-Server wird nichts verändert. Danach weiter mit Schritt 4.
+
+   **Ohne SSH: Shop-Dateien kopieren** (Webroot des Live-Shops nach `testsystem/shop/`), zum Beispiel:
    ```bash
    rsync -a --exclude 'var/cache/*' --exclude 'web/cache/*' user@live-server:/pfad/zum/shop/ shop/
    ```
@@ -90,6 +113,7 @@ Voraussetzung: Docker mit Docker Compose. Unter Windows `testsystem.sh` in WSL o
 
 ```
 ./testsystem.sh start                 Container bauen und starten
+./live-holen.sh [aktualisieren]       Live-Shop displayhaus.de per SSH holen (Dateien + Dump)
 ./testsystem.sh import <dump>         Dump (.sql, .sql.gz, .zip) einspielen; löscht die bisherige Testdatenbank
 ./testsystem.sh refresh               Caches leeren, Plugins neu einlesen, LdZugferd installieren/aktualisieren
 ./testsystem.sh admin [user] [pass]   Backend-Benutzer anlegen

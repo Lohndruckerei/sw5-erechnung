@@ -141,6 +141,9 @@ after_change() {
     fi
     console sw:cache:clear || true
     console sw:theme:cache:generate || true
+    # Shopware cached u. a. die Plugin-Konfiguration im APCu des Webservers; die Konsole leert nur ihr eigenes
+    # APCu. Apache neu laden, sonst rechnet das Backend mit alten Einstellungen (z. B. nach einem Plugin-Update).
+    compose exec -T app apache2ctl -k graceful 2>/dev/null || compose restart app
 }
 
 cmd_admin() {
